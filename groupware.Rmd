@@ -1,0 +1,80 @@
+---
+title: "Practical Machine Learning - Weight Lifting Analysis - groupware dataset"
+author: "Romain Cosandey"
+date: "May 5, 2017"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+This project deals with analysing existing data and developing predictive models using machine learning algorithms using the CARET Package of R programming language. These models will be used to predict outcome of new data.
+
+## Executive Summary
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement. A group of enthusiasts took measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it.
+
+Goal of this project is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. Participants were asked to perform barbell lifts correctly and incorrectly in 5 different ways. This data was recorded at regular intervals. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Goal
+
+Goal of the project is to fit a model with given training data set and predict classe variable of the testing data set.
+
+## Model selection
+To achieve the goal models are trained using below mentioned algorithms. After repeated trials and tuning process, for our dataset, we found RandomForest to be working best after applying tuning controls.
+Here is a list of all algortihms tested:
+
+* Logistic regression model (GBM)
+
+* Random Forest
+
+* Linear discrimninant analysis
+
+* Multivariate linear regression
+
+## Loading and pre-processing the data
+First we load the data from the csv files downloaded from http://groupware.les.inf.puc-rio.br/har
+```{r}
+trainRawData <- read.csv("pml-training.csv",na.strings=c("NA",""));
+```
+We then clean the data by removing the NA values
+```{r}
+NAs <- apply(trainRawData,2,function(x) {sum(is.na(x))});
+validData <- trainRawData[,which(NAs == 0)];
+```
+Further cleaning is done by removing some variables with low predicting powers
+```{r}
+removeIndex <- grep("timestamp|X|user_name|new_window",names(validData));
+validData <- validData[,-removeIndex];
+```
+Data partitioning into training (70%) and testing (30%) datasets. The training dataset will be used to fit and train the model whereas the tesint one will be used to cross validate it.
+```{r, message=FALSE, warning=FALSE}
+library(caret);
+trainIndex <- createDataPartition(y = validData$classe, p=0.7,list=FALSE);
+training <- validData[trainIndex,];
+testing <- validData[-trainIndex,];
+```
+The final dataset has the following characteristics:
+
+* 13737 observations for the training set and 5885 for the testing one
+
+* 53 predictors
+
+* 5 Classes (A,B,C,D,E)
+
+## Model Fitting
+In this section we fit a random forest algorithm to our data. We use the trainin dataset where classe is the outcome and all other features are predictors. We use the trainControl function to cross validate our model.
+```{r, message=FALSE, warning=FALSE}
+trControl = trainControl(method = "cv", number = 4, allowParallel =TRUE);
+modFitRF <- train(training[,1:53],training$classe,method="rf",trControl=trControl);
+```
+The model fitted has a high level of accuracy (99.6%)
+```{r}
+modFitRF
+```
+
+## Cross validation
+We then use the testing dataset to cross validate our model and to measure how it perform on out of sample data.
+```{r}
+predictedValues<-predict(modFitRF,testing);
+confusionMatrix(predictedValues, testing$classe)
+```
+Out of sample error is : 0.2%
